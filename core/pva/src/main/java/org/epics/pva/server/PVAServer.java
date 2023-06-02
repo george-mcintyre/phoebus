@@ -10,6 +10,7 @@ package org.epics.pva.server;
 import static org.epics.pva.PVASettings.logger;
 
 import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
 import java.util.concurrent.ForkJoinPool;
@@ -172,16 +173,17 @@ public class PVAServer implements AutoCloseable
      */
     boolean handleSearchRequest(final int seq, final int cid, final String name,
                                 final InetSocketAddress client,
-                                final ServerTCPHandler tcp_connection)
+                                final ServerTCPHandler tcp_connection,
+                                final List<String> protocols)
     {
         final Consumer<InetSocketAddress> send_search_reply = server_address ->
         {
             // If received via TCP, reply via same connection.
             if (tcp_connection != null)
-                tcp_connection.submitSearchReply(guid, seq, cid, server_address);
+                tcp_connection.submitSearchReply(guid, seq, cid, server_address, protocols);
             else
                 // Otherwise reply via UDP to the given address.
-                POOL.execute(() -> udp.sendSearchReply(guid, seq, cid, server_address, client));
+                POOL.execute(() -> udp.sendSearchReply(guid, seq, cid, server_address, client, protocols));
         };
 
         // Does custom handler consume the search request?
@@ -192,9 +194,9 @@ public class PVAServer implements AutoCloseable
         if (cid < 0)
         {   // 'List servers' search, no specific name
             if (tcp_connection != null)
-                tcp_connection.submitSearchReply(guid, seq, -1, USE_THIS_TCP_CONNECTION);
+                tcp_connection.submitSearchReply(guid, seq, -1, USE_THIS_TCP_CONNECTION, protocols);
             else
-                POOL.execute(() -> udp.sendSearchReply(guid, 0, -1, getTCPAddress(), client));
+                POOL.execute(() -> udp.sendSearchReply(guid, 0, -1, getTCPAddress(), client, protocols));
             return true;
         }
         else

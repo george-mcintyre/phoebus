@@ -12,6 +12,7 @@ import static org.epics.pva.PVASettings.logger;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.List;
 import java.util.logging.Level;
 
 import org.epics.pva.common.CommandHandlers;
@@ -141,12 +142,12 @@ class ServerTCPHandler extends TCPHandler
             super.handleApplicationMessage(command, buffer);
     }
 
-    void submitSearchReply(final Guid guid, final int seq, final int cid, final InetSocketAddress server_address)
+    void submitSearchReply(final Guid guid, final int seq, final int cid, final InetSocketAddress server_address, final List<String> protocols)
     {
         final RequestEncoder encoder = (version, buffer) ->
         {
             logger.log(Level.FINER, "Sending TCP search reply");
-            SearchResponse.encode(guid, seq, cid, server_address.getAddress(), server_address.getPort(), buffer);
+            SearchResponse.encode(guid, seq, cid, server_address.getAddress(), server_address.getPort(), buffer, protocols);
         };
         submit(encoder);
     }

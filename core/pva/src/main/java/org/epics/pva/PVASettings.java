@@ -198,6 +198,72 @@ public class PVASettings
      */
     public static int EPICS_PVA_MAX_BEACON_AGE = 300;
 
+    /**
+     * Enable TLS support in the PV Access Client.
+     *
+     *  <p>This is a temporary flag that will be used during the
+     *  introduction if TLS to epics.  When TLS is fully supported
+     *  in EPICS this flag will become obsolete
+     *
+     *  <p>When this flag is set TLS support will be turned on
+     *  in code.  This allows for complete backwards compatibility
+     *  of code.
+     */
+    public static boolean EPICS_PVA_ENABLE_TLS_SUPPORT = true;
+
+    /**
+     * Enable TLS support in the PV Access Server.
+     *
+     *  <p>This is a temporary flag that will be used during the
+     *  introduction if TLS to epics.  When TLS is fully supported
+     *  in EPICS this flag will become obsolete
+     *
+     *  <p>When this flag is set TLS support will be turned on
+     *  in code.  This allows for complete backwards compatibility
+     *  of code.
+     */
+    public static boolean EPICS_PVAS_ENABLE_TLS_SUPPORT = false;
+
+    /**
+     * Accept TCP connections
+     *
+     * <p>When TCP support is enabled this flag will control whether
+     * insecure TCP connections will be accepted for this client
+     *
+     *  <p>Should be set to 'NO' (false) - default - if only secure communications
+     *  are allowed.  This will modify search requests to contain only "tls"
+     *  protocol.
+     *
+     *  <p>Set to 'YES' (true) to allow insecure connections.
+     *  This will modify all search requests to request both "tcp" and "tls"
+     *  protocols.
+     *
+     *  <p>Note: A legacy client always requests tcp connections.
+     *
+     *  <p>When setting the environment variable or java property,
+     *  values 'YES' or 'NO' are used instead of 'true' and 'false'
+     *  for compatibility with EPICS base usage of these environment
+     *  variables.
+     */
+    public static boolean EPICS_PVA_ACCEPT_TCP_CONNECTIONS = true;
+
+    /**
+     * Allow TCP connections
+     *
+     * <p>When TCP support is enabled this flag will control whether
+     * insecure TCP connections will be allowed for this server
+     *
+     *  <p>Should be set to 'NO' (false) if only secure communications
+     *  are allowed.  set to 'YES' (true) to allow insecure connections if
+     *  a client requests it.  Note: A legacy client always requests tcp connections.
+     *
+     *  <p>When setting the environment variable or java property,
+     *  values 'YES' or 'NO' are used instead of 'true' and 'false'
+     *  for compatibility with EPICS base usage of these environment
+     *  variables.
+     */
+    public static boolean EPICS_PVAS_ALLOW_TCP_CONNECTIONS = false;
+
     static
     {
         EPICS_PVA_ADDR_LIST = get("EPICS_PVA_ADDR_LIST", EPICS_PVA_ADDR_LIST);
@@ -213,6 +279,10 @@ public class PVASettings
         EPICS_PVA_FAST_BEACON_MIN = get("EPICS_PVA_FAST_BEACON_MIN", EPICS_PVA_FAST_BEACON_MIN);
         EPICS_PVA_FAST_BEACON_MAX = get("EPICS_PVA_FAST_BEACON_MAX", EPICS_PVA_FAST_BEACON_MAX);
         EPICS_PVA_MAX_BEACON_AGE = get("EPICS_PVA_MAX_BEACON_AGE", EPICS_PVA_MAX_BEACON_AGE);
+        EPICS_PVA_ENABLE_TLS_SUPPORT = get("EPICS_PVA_ENABLE_TLS_SUPPORT", EPICS_PVA_ENABLE_TLS_SUPPORT);
+        EPICS_PVAS_ENABLE_TLS_SUPPORT = get("EPICS_PVAS_ENABLE_TLS_SUPPORT", EPICS_PVAS_ENABLE_TLS_SUPPORT);
+        EPICS_PVA_ACCEPT_TCP_CONNECTIONS = get("EPICS_PVA_ACCEPT_TCP_CONNECTIONS", EPICS_PVA_ACCEPT_TCP_CONNECTIONS);
+        EPICS_PVAS_ALLOW_TCP_CONNECTIONS = get("EPICS_PVAS_ALLOW_TCP_CONNECTIONS", EPICS_PVAS_ALLOW_TCP_CONNECTIONS);
     }
 
     /** Get setting from property, environment or default

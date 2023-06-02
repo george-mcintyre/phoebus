@@ -7,17 +7,19 @@
  ******************************************************************************/
 package org.epics.pva.common;
 
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-
+import org.epics.pva.PVASettings;
 import org.epics.pva.data.PVAAddress;
 import org.epics.pva.data.PVABool;
 import org.epics.pva.data.PVAString;
 import org.epics.pva.server.Guid;
 
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.util.List;
+
 /** Decode a server's SEARCH reply
- *  @author Kay Kasemir
+ * @author Kay Kasemir
  */
 @SuppressWarnings("nls")
 public class SearchResponse
@@ -40,15 +42,17 @@ public class SearchResponse
     /** Channel IDs (client IDs) that server reports as found */
     public int[] cid;
 
+    /** Does the server response support a tls connection */
+    public boolean tls;
+
     /** Decode search response
      *
-     *  @param payload Size of valid payload (may be less than buffer.remaining())
-     *  @param buffer {@link ByteBuffer}
-     *  @return {@link SearchResponse}
-     *  @throws Exception on error
+     * @param payload Size of valid payload (may be less than buffer.remaining())
+     * @param buffer  {@link ByteBuffer}
+     * @return {@link SearchResponse}
+     * @throws Exception on error
      */
-    public static SearchResponse decode(final int payload, final ByteBuffer buffer) throws Exception
-    {
+    public static SearchResponse decode(final int payload, final ByteBuffer buffer) throws Exception {
         final SearchResponse result = new SearchResponse();
         // Get 'version' from within the PV
         int pos = buffer.position();
@@ -68,12 +72,9 @@ public class SearchResponse
 
         // Server's address and port
         final InetAddress addr;
-        try
-        {
+        try {
             addr = PVAAddress.decode(buffer);
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             throw new Exception("PVA Server sent search reply with invalid address", ex);
         }
         final int port = Short.toUnsignedInt(buffer.getShort());
@@ -85,33 +86,35 @@ public class SearchResponse
             result.server = new InetSocketAddress(addr, port);
 
         final String protocol = PVAString.decodeString(buffer);
-        if (! "tcp".equals(protocol))
-            throw new Exception("PVA Server sent search reply #" + result.seq + " for protocol '" + protocol + "'");
+        result.tls = "tls".equals(protocol);
+        if (!"tcp".equals(protocol) && !result.tls) {
+             throw new Exception("PVA Server sent search reply #" + result.seq + " for protocol '" + protocol + "'");
+        }
 
         // Server may reply with list of PVs that it does _not_ have...
         result.found = PVABool.decodeBoolean(buffer);
 
         final int count = Short.toUnsignedInt(buffer.getShort());
         result.cid = new int[count];
-        for (int i=0; i<count; ++i)
+        for (int i = 0; i < count; ++i)
             result.cid[i] = buffer.getInt();
 
         return result;
     }
 
     /** Encode a search response
-     *  @param guid This server's GUID
-     *  @param seq Client search request sequence number
-     *  @param cid Client's channel ID or -1
-     *  @param address Address where client can connect to access the channel
-     *  @param port Associated TCP port
-     *  @param buffer Buffer into which search response will be encoded
+     * @param guid    This server's GUID
+     * @param seq     Client search request sequence number
+     * @param cid     Client's channel ID or -1
+     * @param address Address where client can connect to access the channel
+     * @param port    Associated TCP port
+     * @param buffer  Buffer into which search response will be encoded
      */
     public static void encode(final Guid guid, final int seq, final int cid,
                               final InetAddress address, final int port,
-                              final ByteBuffer buffer)
+                              final ByteBuffer buffer, final List<String> protocols)
     {
-        PVAHeader.encodeMessageHeader(buffer, PVAHeader.FLAG_SERVER, PVAHeader.CMD_SEARCH_RESPONSE, 12+4+16+2+4+1+2+ (cid < 0 ? 0 : 4));
+        PVAHeader.encodeMessageHeader(buffer, PVAHeader.FLAG_SERVER, PVAHeader.CMD_SEARCH_RESPONSE, 12 + 4 + 16 + 2 + 4 + 1 + 2 + (cid < 0 ? 0 : 4));
 
         // Server GUID
         guid.encode(buffer);
@@ -121,20 +124,23 @@ public class SearchResponse
 
         // Server's address and port
         PVAAddress.encode(address, buffer);
-        buffer.putShort((short)port);
+        buffer.putShort((short) port);
 
-        // Protocol
-        PVAString.encodeString("tcp", buffer);
+        // Protocol: Assumes that validity has already been checked in decode()
+        if (PVASettings.EPICS_PVAS_ENABLE_TLS_SUPPORT && protocols.contains("tls")) {
+            PVAString.encodeString("tls", buffer);
+        } else {
+            PVAString.encodeString("tcp", buffer);
+        }
 
         // Found
         PVABool.encodeBoolean(cid >= 0, buffer);
 
         // int[] cid;
         if (cid < 0)
-            buffer.putShort((short)0);
-        else
-        {
-            buffer.putShort((short)1);
+            buffer.putShort((short) 0);
+        else {
+            buffer.putShort((short) 1);
             buffer.putInt(cid);
         }
     }

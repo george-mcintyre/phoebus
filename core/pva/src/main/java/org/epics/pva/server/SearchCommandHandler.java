@@ -35,6 +35,6 @@ class SearchCommandHandler implements CommandHandler<ServerTCPHandler>
         if (search.channels != null)
             for (SearchRequest.Channel channel : search.channels)
                 tcp.getServer().handleSearchRequest(search.seq, channel.getCID(), channel.getName(),
-                                                    search.client, tcp);
+                                                    search.client, tcp, search.protocols);
     }
 }
