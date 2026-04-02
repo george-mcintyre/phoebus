@@ -160,10 +160,16 @@ class ClientTCPHandler extends TCPHandler
         return client;
     }
 
+    /** @return <code>true</code> if this connection uses TLS */
+    public boolean isTLS()
+    {
+        return tls;
+    }
+
     /** When using TLS, the socket has a peer (server, IOC) certificate
      *  @return Name from server's certificate, or <code>null</code>
      */
-    String getServerX509Name()
+    public String getServerX509Name()
     {
         try
         {
@@ -180,7 +186,7 @@ class ClientTCPHandler extends TCPHandler
     /** When using TLS, the socket may come with a local (client) certificate
      *  that TLS uses to authenticate to the server.
      *  @return Name from client's certificate, or <code>null</code> */
-    String getClientX509Name()
+    public String getClientX509Name()
     {
         return tls ? SecureSockets.getPrincipalCN(((SSLSocket) socket).getSession().getLocalPrincipal())
                    : null;
