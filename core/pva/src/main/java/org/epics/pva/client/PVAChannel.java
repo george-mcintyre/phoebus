@@ -132,6 +132,23 @@ public class PVAChannel extends SearchRequest.Channel implements AutoCloseable
         return handler != null ? handler.getClientX509Name() : null;
     }
 
+    /** @return Authentication method description, or <code>null</code> when disconnected */
+    public String getAuthenticationInfo()
+    {
+        final ClientTCPHandler handler = tcp.get();
+        return handler != null ? handler.getAuthenticationInfo() : null;
+    }
+
+    /** @return Server address as host:port, or <code>null</code> when disconnected */
+    public String getRemoteAddress()
+    {
+        final ClientTCPHandler handler = tcp.get();
+        if (handler == null)
+            return null;
+        final java.net.InetSocketAddress addr = handler.getRemoteAddress();
+        return addr.getAddress().getHostAddress() + ":" + addr.getPort();
+    }
+
     /** @return Server channel ID */
     int getSID()
     {

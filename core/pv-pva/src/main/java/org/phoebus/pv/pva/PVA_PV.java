@@ -225,6 +225,18 @@ public class PVA_PV extends PV
         return channel.getClientX509Name();
     }
 
+    /** @return Authentication method description, or <code>null</code> when disconnected */
+    public String getAuthenticationInfo()
+    {
+        return channel.getAuthenticationInfo();
+    }
+
+    /** @return Server address as host:port, or <code>null</code> when disconnected */
+    public String getRemoteAddress()
+    {
+        return channel.getRemoteAddress();
+    }
+
     @Override
     protected void close()
     {
