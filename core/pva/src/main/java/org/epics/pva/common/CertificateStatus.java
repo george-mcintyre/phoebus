@@ -10,15 +10,27 @@ package org.epics.pva.common;
 import static org.epics.pva.PVASettings.logger;
 
 import java.security.MessageDigest;
+import java.security.cert.CertPath;
+import java.security.cert.CertPathValidator;
+import java.security.cert.CertificateFactory;
+import java.security.cert.PKIXParameters;
+import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Collection;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 
 import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.bouncycastle.cert.ocsp.BasicOCSPResp;
 import org.bouncycastle.cert.ocsp.CertificateID;
@@ -166,16 +178,34 @@ public class CertificateStatus
             final BasicOCSPResp basic = (BasicOCSPResp) ocsp_response.getResponseObject();
             logger.log(Level.FINER, () -> "OCSP responder " + basic.getResponderId().toASN1Primitive().getName());
 
-            // Validate against certificates in our key chain
+            // Validate the OCSP response signature.
+            //
+            // The response is signed by the responder of the certificate authority that
+            // issued the certificate we are checking. In a federated hierarchy that authority
+            // may be a different intermediate CA than the one that issued our own certificate
+            // (for example when a Lab-zone client checks the status of an ML-zone peer). Its
+            // signing certificate is therefore not necessarily present in our keychain, but it
+            // is carried inside the OCSP response and chains up to the shared root that we do
+            // trust. So mirror the C++ PVXS check (OCSP_basic_verify in certstatus.cpp): try
+            // each candidate signing certificate - those in our keychain and those embedded in
+            // the response - and accept the first that both signs the response and is itself
+            // trusted (a keychain certificate, or one that chains to a trusted keychain CA).
             boolean valid = false;
-            for (X509Certificate x509 : SecureSockets.keychain_x509_certificates.values())
-                if (basic.isSignatureValid(new JcaContentVerifierProviderBuilder().build(x509)))
+            for (final X509Certificate signer : ocspSignerCandidates(basic))
+            {
+                if (! basic.isSignatureValid(new JcaContentVerifierProviderBuilder().build(signer)))
+                    continue;
+                if (! isTrusted(signer))
                 {
-                    logger.log(Level.FINER, () -> "OCSP response verified by trusted certificate for " +
-                                                  x509.getSubjectX500Principal());
-                    valid = true;
-                    break;
+                    logger.log(Level.FINER, () -> "OCSP response signed by untrusted certificate " +
+                                                  signer.getSubjectX500Principal() + ", ignoring");
+                    continue;
                 }
+                logger.log(Level.FINER, () -> "OCSP response verified by trusted certificate for " +
+                                              signer.getSubjectX500Principal());
+                valid = true;
+                break;
+            }
             if (! valid)
                 throw new Exception("Cannot validate OCSP response");
 
@@ -295,5 +325,75 @@ public class CertificateStatus
     {
         final String peer_name = certificate.getSubjectX500Principal().getName();
         return pv.getName() + " for '" + peer_name + "' is " + status;
+    }
+
+    /** Candidate certificates that may have signed an OCSP response.
+     *
+     *  <p>Combines the certificates in our keychain (which cover the common case where the
+     *  responder is a certificate authority we already hold) with the certificates embedded
+     *  in the OCSP response itself (which cover a federated hierarchy, where the response is
+     *  signed by another zone's intermediate certificate authority that we do not hold but
+     *  which chains up to a root we trust).
+     *
+     *  @param basic Parsed OCSP response
+     *  @return Certificates to try as the signer of the response
+     */
+    private static List<X509Certificate> ocspSignerCandidates(final BasicOCSPResp basic)
+    {
+        final List<X509Certificate> candidates = new ArrayList<>(SecureSockets.keychain_x509_certificates.values());
+        try
+        {
+            final JcaX509CertificateConverter converter = new JcaX509CertificateConverter();
+            for (final X509CertificateHolder holder : basic.getCerts())
+                candidates.add(converter.getCertificate(holder));
+        }
+        catch (Exception ex)
+        {
+            logger.log(Level.FINE, "Cannot extract certificates embedded in OCSP response", ex);
+        }
+        return candidates;
+    }
+
+    /** Is a certificate one we trust to sign an OCSP response?
+     *
+     *  <p>A certificate is trusted when it is present in our keychain, or when it chains up to
+     *  a certificate authority in our keychain (the shared root). This mirrors the C++ PVXS
+     *  check, where {@code OCSP_basic_verify} validates the response's signer against the
+     *  trusted certificate store.
+     *
+     *  @param signer Certificate that signed the OCSP response
+     *  @return Whether the signer is trusted
+     */
+    private static boolean isTrusted(final X509Certificate signer)
+    {
+        final Collection<X509Certificate> trusted = SecureSockets.keychain_x509_certificates.values();
+
+        // Fast path: the signer itself is a certificate we already hold.
+        for (final X509Certificate x509 : trusted)
+            if (x509.equals(signer))
+                return true;
+
+        // Otherwise, does the signer chain up to a trusted certificate authority in the keychain?
+        try
+        {
+            final Set<TrustAnchor> anchors = new HashSet<>();
+            for (final X509Certificate x509 : trusted)
+                anchors.add(new TrustAnchor(x509, null));
+            if (anchors.isEmpty())
+                return false;
+
+            final PKIXParameters params = new PKIXParameters(anchors);
+            params.setRevocationEnabled(false);
+            final CertPath path = CertificateFactory.getInstance("X.509")
+                    .generateCertPath(List.of(signer));
+            CertPathValidator.getInstance("PKIX").validate(path, params);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.log(Level.FINER, () -> "OCSP signer " + signer.getSubjectX500Principal() +
+                                          " does not chain to a trusted certificate authority: " + ex.getMessage());
+            return false;
+        }
     }
 }
