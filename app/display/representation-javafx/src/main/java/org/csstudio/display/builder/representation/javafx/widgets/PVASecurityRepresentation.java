@@ -104,10 +104,15 @@ public class PVASecurityRepresentation extends JFXBaseRepresentation<HBox, PVASe
     public void updateChanges()
     {
         super.updateChanges();
-        if (dirty_size.checkAndClear())
+        final boolean resized = dirty_size.checkAndClear();
+        if (resized)
             jfx_node.resize(model_widget.propWidth().getValue(), model_widget.propHeight().getValue());
         if (! dirty_content.checkAndClear())
+        {
+            if (resized)
+                layoutChildren();
             return;
+        }
 
         final PVASecurityMode mode = model_widget.propDisplayMode().getValue();
         switch (mode)
@@ -150,6 +155,19 @@ public class PVASecurityRepresentation extends JFXBaseRepresentation<HBox, PVASe
             }
             break;
         }
+
+        layoutChildren();
+    }
+
+    /** Position the icon and the text inside the box.
+     *
+     *  The box is unmanaged, so its parent never lays it out and nothing else asks it to.
+     *  Without this the icon still paints, because a shape draws from its own path data, but
+     *  the label is never given a position or a size and so shows nothing at all.
+     */
+    private void layoutChildren()
+    {
+        jfx_node.layout();
     }
 
     private String orDash(final String text)
