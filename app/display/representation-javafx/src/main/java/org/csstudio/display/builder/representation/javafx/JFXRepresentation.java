@@ -961,8 +961,21 @@ public class JFXRepresentation extends ToolkitRepresentation<Parent, Node>
         // Set the background of the parent BorderPane 
         if (model_root.getParent() instanceof Pane)
             ((Pane) model_root.getParent()).setBackground(bg);
-        // Now make the scroll pane transparent to see the parent background
-        model_root.setStyle("-fx-background: transparent; -fx-background-color: transparent; ");
+        // Now make the scroll pane transparent to see the parent background.
+        //
+        // "-fx-background" is not a paint: it is the looked-up color the default stylesheet's
+        // contrast ladder reads to pick dark or light text, and it inherits to every widget in
+        // the display. Transparent has brightness zero, so the ladder decides the background is
+        // dark and turns label text white on the first CSS pass after the stage shows,
+        // overwriting the color a representation set with setTextFill. Whether anyone sees that
+        // depends on timing: when a widget update runs after that CSS pass the color is set
+        // again and sticks, which is why fast machines look fine and a slow container shows
+        // every label white. Redefining "-fx-text-background-color" alongside pins the ladder's
+        // result to what it would give over the display's actual background color.
+        model_root.setStyle("-fx-background: transparent; -fx-background-color: transparent; " +
+                            String.format("-fx-text-background-color: ladder(#%02X%02X%02X",
+                                          background.getRed(), background.getGreen(), background.getBlue()) +
+                            ", -fx-light-text-color 45%, -fx-dark-text-color 46%, -fx-dark-text-color 59%, -fx-mid-text-color 60%); ");
         // Also set background of content to workaround JFX bugs (https://bugs.openjdk.org/browse/JDK-8118303
         // and https://bugs.openjdk.org/browse/JDK-8095008) where text is rendered badly inside a transparent 
         // ScrollPane.
