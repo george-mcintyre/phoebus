@@ -64,7 +64,7 @@ public class CertificateStatus
         // Eventually we only care about VALID or not.
         // The other options as found in PVACMS (Nov. 2025) are all considered "not VALID"
         // and only informational to reflect the more detailed state
-        UNKNOWN, VALID, PENDING, PENDING_APPROVAL, PENDING_RENEWAL, EXPIRED, REVOKED
+        UNKNOWN, VALID, PENDING, PENDING_APPROVAL, PENDING_RENEWAL, EXPIRED, REVOKED, AUTHORITY_REVOKED
     }
 
     /** Certificate to check */
